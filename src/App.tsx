@@ -1,7 +1,11 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { Loader2, Lock } from 'lucide-react';
 import { ThemeProvider } from './context/ThemeContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { Layout } from './components/layout/Layout';
 import { Login } from './pages/Login';
+import { hasPermission, PAGE_PERMISSIONS, ROLE_LABELS } from './services/rbac';
+import { seedNotificationsIfEmpty } from './services/notifications';
 import type { Filters } from './types/analytics';
 
 const Overview = lazy(() => import('./pages/Overview').then((m) => ({ default: m.Overview })));
@@ -17,6 +21,7 @@ const Reports = lazy(() => import('./pages/Reports').then((m) => ({ default: m.R
 const Integrations = lazy(() => import('./pages/Integrations').then((m) => ({ default: m.Integrations })));
 const Notifications = lazy(() => import('./pages/Notifications').then((m) => ({ default: m.Notifications })));
 const Settings = lazy(() => import('./pages/Settings').then((m) => ({ default: m.Settings })));
+const UserManagement = lazy(() => import('./pages/UserManagement').then((m) => ({ default: m.UserManagement })));
 
 const defaultFilters: Filters = {
   range: 'year',
@@ -25,23 +30,28 @@ const defaultFilters: Filters = {
   status: 'all',
 };
 
-function App() {
-  const [authed, setAuthed] = useState(false);
+function Dashboard() {
+  const { profile, loading } = useAuth();
   const [page, setPage] = useState('overview');
   const [filters, setFilters] = useState<Filters>(defaultFilters);
 
-  if (!authed) {
+  useEffect(() => {
+    if (profile) seedNotificationsIfEmpty(profile.id);
+  }, [profile]);
+
+  if (loading) {
     return (
-      <ThemeProvider>
-        <Login onLogin={() => setAuthed(true)} />
-      </ThemeProvider>
+      <div className="flex items-center justify-center h-screen bg-bg">
+        <Loader2 size={28} className="animate-spin text-primary" />
+      </div>
     );
   }
 
+  const withSuspense = (node: React.ReactNode) => (
+    <Suspense fallback={<div className="flex items-center justify-center py-24"><Loader2 size={20} className="animate-spin text-primary" /></div>}>{node}</Suspense>
+  );
+
   const renderPage = () => {
-    const withSuspense = (node: React.ReactNode) => (
-      <Suspense fallback={<div className="flex items-center justify-center py-24 text-sm text-muted">Loading...</div>}>{node}</Suspense>
-    );
     switch (page) {
       case 'overview':
         return withSuspense(<Overview filters={filters} onFiltersChange={setFilters} />);
@@ -69,18 +79,57 @@ function App() {
         return withSuspense(<Notifications />);
       case 'settings':
         return withSuspense(<Settings />);
+      case 'users':
+        return withSuspense(<UserManagement />);
       default:
         return withSuspense(<Overview filters={filters} onFiltersChange={setFilters} />);
     }
   };
 
+  const requiredPermission = PAGE_PERMISSIONS[page];
+  const canAccess = !requiredPermission || hasPermission(profile?.role, requiredPermission as never);
+
   return (
-    <ThemeProvider>
-      <Layout active={page} onNavigate={setPage}>
-        {renderPage()}
-      </Layout>
-    </ThemeProvider>
+    <Layout active={page} onNavigate={setPage}>
+      {canAccess ? (
+        renderPage()
+      ) : (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center mb-4">
+            <Lock size={28} className="text-error" />
+          </div>
+          <h2 className="text-lg font-semibold mb-1">Access Denied</h2>
+          <p className="text-sm text-muted max-w-sm">
+            Your role ({ROLE_LABELS[profile?.role ?? 'viewer']}) does not have permission to view this page.
+            Contact your administrator to request access.
+          </p>
+        </div>
+      )}
+    </Layout>
   );
 }
 
-export default App;
+function AppInner() {
+  const { session, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-bg">
+        <Loader2 size={28} className="animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!session) return <Login />;
+  return <Dashboard />;
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AuthProvider>
+        <AppInner />
+      </AuthProvider>
+    </ThemeProvider>
+  );
+}

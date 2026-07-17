@@ -1,6 +1,8 @@
 import { NAV_ITEMS } from '../../config/navigation';
 import { clsx } from '../../utils/clsx';
-import { BarChart3, X } from 'lucide-react';
+import { BarChart3, X, LogOut } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { hasPermission, ROLE_LABELS } from '../../services/rbac';
 
 interface SidebarProps {
   active: string;
@@ -10,7 +12,10 @@ interface SidebarProps {
 }
 
 export function Sidebar({ active, onNavigate, open, onClose }: SidebarProps) {
-  const groups = Array.from(new Set(NAV_ITEMS.map((n) => n.group)));
+  const { profile, signOut } = useAuth();
+  const role = profile?.role;
+  const visibleItems = NAV_ITEMS.filter((n) => hasPermission(role, n.permission as never));
+  const groups = Array.from(new Set(visibleItems.map((n) => n.group)));
 
   return (
     <>
@@ -41,7 +46,7 @@ export function Sidebar({ active, onNavigate, open, onClose }: SidebarProps) {
             <div key={group}>
               <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted">{group}</p>
               <div className="space-y-1">
-                {NAV_ITEMS.filter((n) => n.group === group).map((item) => {
+                {visibleItems.filter((n) => n.group === group).map((item) => {
                   const Icon = item.icon;
                   const isActive = active === item.id;
                   return (
@@ -65,10 +70,18 @@ export function Sidebar({ active, onNavigate, open, onClose }: SidebarProps) {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-border">
-          <div className="surface-2 rounded-xl p-3">
-            <p className="text-xs font-semibold mb-1">Plan: Enterprise</p>
-            <p className="text-[11px] text-muted">Unlimited dashboards & integrations.</p>
+        <div className="p-4 border-t border-border space-y-3">
+          <div className="flex items-center gap-2 px-2">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-500 to-cyan-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+              {profile?.full_name?.charAt(0)?.toUpperCase() || profile?.email?.charAt(0)?.toUpperCase() || 'U'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold truncate">{profile?.full_name || 'User'}</p>
+              <p className="text-[10px] text-muted">{ROLE_LABELS[role ?? 'viewer']}</p>
+            </div>
+            <button onClick={signOut} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-muted hover:text-error transition" title="Sign out">
+              <LogOut size={15} />
+            </button>
           </div>
         </div>
       </aside>

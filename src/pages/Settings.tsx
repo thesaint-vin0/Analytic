@@ -1,10 +1,14 @@
 import { useState } from 'react';
-import { Bell, Globe, Key, Lock, Moon, Palette, Shield, Sun, User, Clock } from 'lucide-react';
+import { Bell, Globe, Key, Lock, Moon, Palette, Shield, Sun, User, Clock, Loader2, Check } from 'lucide-react';
 import { PageHeader } from '../components/PageHeader';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Select } from '../components/ui/Select';
+import { Badge } from '../components/ui/Badge';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
+import { supabase } from '../services/supabase';
+import { ROLE_LABELS } from '../services/rbac';
 import { clsx } from '../utils/clsx';
 
 type Tab = 'profile' | 'appearance' | 'notifications' | 'security' | 'api';
@@ -19,9 +23,29 @@ const tabs: { id: Tab; label: string; icon: typeof User }[] = [
 
 export function Settings() {
   const { theme, setTheme } = useTheme();
+  const { profile, refreshProfile } = useAuth();
   const [tab, setTab] = useState<Tab>('profile');
+  const [fullName, setFullName] = useState(profile?.full_name ?? '');
+  const [timezone, setTimezone] = useState('utc');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [notif, setNotif] = useState({ email: true, push: false, inApp: true, weekly: true });
   const [twoFa, setTwoFa] = useState(false);
+
+  const saveProfile = async () => {
+    if (!profile) return;
+    setSaving(true);
+    setSaved(false);
+    const { error } = await supabase.from('profiles').update({ full_name: fullName }).eq('id', profile.id);
+    setSaving(false);
+    if (error) {
+      console.error(error);
+      return;
+    }
+    await refreshProfile();
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
 
   return (
     <div className="space-y-6">
@@ -53,28 +77,39 @@ export function Settings() {
             <Card>
               <h3 className="text-sm font-semibold mb-4">Profile Information</h3>
               <div className="flex items-center gap-4 mb-6">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-sky-500 to-cyan-600 flex items-center justify-center text-white text-xl font-bold">SA</div>
-                <Button variant="outline" size="sm">Change Avatar</Button>
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-sky-500 to-cyan-600 flex items-center justify-center text-white text-xl font-bold">
+                  {fullName?.charAt(0)?.toUpperCase() || profile?.email?.charAt(0)?.toUpperCase() || 'U'}
+                </div>
+                <div>
+                  <Badge tone="primary">{ROLE_LABELS[profile?.role ?? 'viewer']}</Badge>
+                  <p className="text-xs text-muted mt-1">Role assigned by admin</p>
+                </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <label className="flex flex-col gap-1">
                   <span className="text-xs text-muted">Full Name</span>
-                  <input defaultValue="Sarah Adams" className="surface-2 border border-border rounded-lg px-3 py-2 text-sm" />
+                  <input value={fullName} onChange={(e) => setFullName(e.target.value)} className="surface-2 border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
                 </label>
                 <label className="flex flex-col gap-1">
                   <span className="text-xs text-muted">Email</span>
-                  <input defaultValue="sarah@company.com" className="surface-2 border border-border rounded-lg px-3 py-2 text-sm" />
+                  <input value={profile?.email ?? ''} disabled className="surface-2 border border-border rounded-lg px-3 py-2 text-sm opacity-60" />
                 </label>
                 <label className="flex flex-col gap-1">
                   <span className="text-xs text-muted">Role</span>
-                  <input defaultValue="Super Admin" disabled className="surface-2 border border-border rounded-lg px-3 py-2 text-sm opacity-60" />
+                  <input value={ROLE_LABELS[profile?.role ?? 'viewer']} disabled className="surface-2 border border-border rounded-lg px-3 py-2 text-sm opacity-60" />
                 </label>
                 <label className="flex flex-col gap-1">
                   <span className="text-xs text-muted">Timezone</span>
-                  <Select value="utc" onChange={() => {}} options={[{ label: 'UTC', value: 'utc' }, { label: 'EST', value: 'est' }, { label: 'PST', value: 'pst' }]} />
+                  <Select value={timezone} onChange={setTimezone} options={[{ label: 'UTC', value: 'utc' }, { label: 'EST', value: 'est' }, { label: 'PST', value: 'pst' }, { label: 'CET', value: 'cet' }]} />
                 </label>
               </div>
-              <div className="flex justify-end mt-6"><Button size="sm">Save Changes</Button></div>
+              <div className="flex justify-end items-center gap-3 mt-6">
+                {saved && <span className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1"><Check size={14} /> Saved</span>}
+                <Button size="sm" onClick={saveProfile} disabled={saving}>
+                  {saving ? <Loader2 size={14} className="animate-spin" /> : null}
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </div>
             </Card>
           )}
 
@@ -104,7 +139,7 @@ export function Settings() {
                 </div>
                 <label className="flex flex-col gap-1 max-w-xs">
                   <span className="text-xs text-muted flex items-center gap-1"><Globe size={12} /> Language</span>
-                  <Select value="en" onChange={() => {}} options={[{ label: 'English', value: 'en' }, { label: 'Español', value: 'es' }, { label: 'Français', value: 'fr' }, { label: 'Deutsch', value: 'de' }]} />
+                  <Select value="en" onChange={() => {}} options={[{ label: 'English', value: 'en' }, { label: 'Espanol', value: 'es' }, { label: 'Francais', value: 'fr' }, { label: 'Deutsch', value: 'de' }]} />
                 </label>
               </div>
             </Card>
@@ -146,7 +181,7 @@ export function Settings() {
                     <Lock size={18} className="text-primary" />
                     <div>
                       <p className="text-sm font-medium">Change Password</p>
-                      <p className="text-xs text-muted">Last changed 30 days ago</p>
+                      <p className="text-xs text-muted">Update your account password</p>
                     </div>
                   </div>
                   <Button variant="outline" size="sm">Update</Button>

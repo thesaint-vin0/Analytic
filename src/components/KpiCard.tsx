@@ -14,7 +14,7 @@ interface KpiCardProps {
 export function KpiCard({ metric, index }: KpiCardProps) {
   const [display, setDisplay] = useState(0);
   const positive = metric.change >= 0;
-  const Icon = (Icons as Record<string, Icons.LucideIcon>)[metric.icon] || Icons.Circle;
+  const Icon = (Icons as unknown as Record<string, Icons.LucideIcon>)[metric.icon] || Icons.Circle;
 
   useEffect(() => {
     const duration = 900;
