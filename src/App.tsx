@@ -3,7 +3,10 @@ import { Loader2, Lock } from 'lucide-react';
 
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { OrganizationProvider } from './context/OrganizationContext';
+import {
+  OrganizationProvider,
+  useOrganization,
+} from './context/OrganizationContext';
 
 import { Layout } from './components/layout/Layout';
 import { Login } from './pages/Login';
@@ -86,6 +89,14 @@ const defaultFilters: Filters = {
 function Dashboard() {
   const { profile, loading } = useAuth();
 
+  const {
+    currentOrganization,
+    organizations,
+    loading: organizationLoading,
+    error: organizationError,
+    
+  } = useOrganization();
+
   const [page, setPage] = useState('overview');
 
   const [filters, setFilters] = useState<Filters>(defaultFilters);
@@ -96,6 +107,9 @@ function Dashboard() {
     }
   }, [profile]);
 
+  /*
+   * Wait for authentication/profile loading.
+   */
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-bg">
@@ -103,6 +117,83 @@ function Dashboard() {
           size={28}
           className="animate-spin text-primary"
         />
+      </div>
+    );
+  }
+
+  /*
+   * Wait for organization loading.
+   */
+  if (organizationLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-bg">
+        <Loader2
+          size={28}
+          className="animate-spin text-primary mb-3"
+        />
+
+        <p className="text-sm text-muted">
+          Loading your organization...
+        </p>
+      </div>
+    );
+  }
+
+  /*
+   * Organization loading failed.
+   */
+  if (organizationError) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-bg p-6">
+        <div className="w-full max-w-md text-center">
+          <div className="w-16 h-16 rounded-2xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center mx-auto mb-4">
+            <Lock
+              size={28}
+              className="text-error"
+            />
+          </div>
+
+          <h2 className="text-lg font-semibold mb-2">
+            Unable to load organization
+          </h2>
+
+          <p className="text-sm text-muted mb-4">
+            We could not load the organization associated with your
+            account.
+          </p>
+
+          <p className="text-xs text-error break-words">
+            {organizationError}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  /*
+   * Authenticated user has no organization.
+   */
+  if (!currentOrganization && organizations.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-bg p-6">
+        <div className="w-full max-w-md text-center">
+          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+            <Lock
+              size={28}
+              className="text-primary"
+            />
+          </div>
+
+          <h2 className="text-xl font-semibold mb-2">
+            No organization found
+          </h2>
+
+          <p className="text-sm text-muted mb-6">
+            Your account is not currently associated with an
+            organization. Please contact your administrator or create
+            an organization to continue.
+          </p>
+        </div>
       </div>
     );
   }
