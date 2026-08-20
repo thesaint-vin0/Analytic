@@ -22,3 +22,5 @@ dist-ssr
 *.sw?
 .env
 supabase/.temp/
+# Supabase local temporary files
+supabase/.temp/
