@@ -87,25 +87,133 @@ const defaultFilters: Filters = {
 };
 
 function Dashboard() {
-  const { profile, loading } = useAuth();
+  const { profile, user, loading } = useAuth();
 
   const {
     currentOrganization,
     organizations,
     loading: organizationLoading,
     error: organizationError,
-    
+    createOrganization,
+    refreshOrganizations,
   } = useOrganization();
 
   const [page, setPage] = useState('overview');
 
-  const [filters, setFilters] = useState<Filters>(defaultFilters);
+  const [filters, setFilters] =
+    useState<Filters>(defaultFilters);
 
+  const [creatingOrganization, setCreatingOrganization] =
+    useState(false);
+
+  const [organizationSetupError, setOrganizationSetupError] =
+    useState<string | null>(null);
+
+  /*
+   * Seed notifications after profile loads.
+   */
   useEffect(() => {
     if (profile) {
       seedNotificationsIfEmpty(profile.id);
     }
   }, [profile]);
+
+  /*
+   * Automatically create an organization when the authenticated
+   * user does not belong to one.
+   */
+  useEffect(() => {
+    if (
+      loading ||
+      organizationLoading ||
+      !user ||
+      organizations.length > 0 ||
+      currentOrganization ||
+      creatingOrganization
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const setupOrganization = async () => {
+      setCreatingOrganization(true);
+      setOrganizationSetupError(null);
+
+      try {
+        /*
+         * Build a safe organization name from the user's profile.
+         */
+        const fullName =
+          profile?.full_name?.trim() ||
+          user.user_metadata?.full_name?.trim() ||
+          user.email?.split('@')[0] ||
+          'My Organization';
+
+        const organizationName = `${fullName}'s Organization`;
+
+        /*
+         * Generate a URL-safe slug.
+         */
+        const baseSlug = fullName
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+          .slice(0, 40);
+
+        const organizationSlug =
+          `${baseSlug || 'organization'}-${user.id.slice(0, 8)}`;
+
+        const organization = await createOrganization(
+          organizationName,
+          organizationSlug
+        );
+
+        if (!organization) {
+          throw new Error(
+            'Unable to create your organization.'
+          );
+        }
+
+        if (!cancelled) {
+          await refreshOrganizations();
+        }
+      } catch (error) {
+        console.error(
+          'Automatic organization setup failed:',
+          error
+        );
+
+        if (!cancelled) {
+          setOrganizationSetupError(
+            error instanceof Error
+              ? error.message
+              : 'Unable to create your organization.'
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setCreatingOrganization(false);
+        }
+      }
+    };
+
+    setupOrganization();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    loading,
+    organizationLoading,
+    user,
+    profile,
+    organizations.length,
+    currentOrganization,
+    creatingOrganization,
+    createOrganization,
+    refreshOrganizations,
+  ]);
 
   /*
    * Wait for authentication/profile loading.
@@ -140,9 +248,34 @@ function Dashboard() {
   }
 
   /*
+   * Creating the user's first organization.
+   */
+  if (creatingOrganization) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-bg">
+        <Loader2
+          size={28}
+          className="animate-spin text-primary mb-3"
+        />
+
+        <h2 className="text-lg font-semibold mb-2">
+          Setting up your organization
+        </h2>
+
+        <p className="text-sm text-muted">
+          Preparing your Pulse Analytics workspace...
+        </p>
+      </div>
+    );
+  }
+
+  /*
    * Organization loading failed.
    */
-  if (organizationError) {
+  if (organizationError || organizationSetupError) {
+    const errorMessage =
+      organizationSetupError || organizationError;
+
     return (
       <div className="flex items-center justify-center min-h-screen bg-bg p-6">
         <div className="w-full max-w-md text-center">
@@ -154,16 +287,16 @@ function Dashboard() {
           </div>
 
           <h2 className="text-lg font-semibold mb-2">
-            Unable to load organization
+            Unable to set up organization
           </h2>
 
           <p className="text-sm text-muted mb-4">
-            We could not load the organization associated with your
-            account.
+            We could not prepare the organization associated
+            with your account.
           </p>
 
           <p className="text-xs text-error break-words">
-            {organizationError}
+            {errorMessage}
           </p>
         </div>
       </div>
@@ -171,29 +304,21 @@ function Dashboard() {
   }
 
   /*
-   * Authenticated user has no organization.
+   * At this point, if there is still no organization,
+   * show a temporary setup state instead of blocking
+   * the user with the old "No organization found" screen.
    */
   if (!currentOrganization && organizations.length === 0) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-bg p-6">
-        <div className="w-full max-w-md text-center">
-          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
-            <Lock
-              size={28}
-              className="text-primary"
-            />
-          </div>
+      <div className="flex flex-col items-center justify-center h-screen bg-bg">
+        <Loader2
+          size={28}
+          className="animate-spin text-primary mb-3"
+        />
 
-          <h2 className="text-xl font-semibold mb-2">
-            No organization found
-          </h2>
-
-          <p className="text-sm text-muted mb-6">
-            Your account is not currently associated with an
-            organization. Please contact your administrator or create
-            an organization to continue.
-          </p>
-        </div>
+        <p className="text-sm text-muted">
+          Finalizing your workspace...
+        </p>
       </div>
     );
   }
@@ -297,7 +422,8 @@ function Dashboard() {
     }
   };
 
-  const requiredPermission = PAGE_PERMISSIONS[page];
+  const requiredPermission =
+    PAGE_PERMISSIONS[page];
 
   const canAccess =
     !requiredPermission ||
@@ -328,7 +454,9 @@ function Dashboard() {
 
           <p className="text-sm text-muted max-w-sm">
             Your role (
-            {ROLE_LABELS[profile?.role ?? 'viewer']}
+            {ROLE_LABELS[
+              profile?.role ?? 'viewer'
+            ]}
             ) does not have permission to view this page.
             Contact your administrator to request access.
           </p>
