@@ -22,55 +22,81 @@ import { seedNotificationsIfEmpty } from './services/notifications';
 import type { Filters } from './types/analytics';
 
 const Overview = lazy(() =>
-  import('./pages/Overview').then((m) => ({ default: m.Overview }))
+  import('./pages/Overview').then((m) => ({
+    default: m.Overview,
+  }))
 );
 
 const Realtime = lazy(() =>
-  import('./pages/Realtime').then((m) => ({ default: m.Realtime }))
+  import('./pages/Realtime').then((m) => ({
+    default: m.Realtime,
+  }))
 );
 
 const Sales = lazy(() =>
-  import('./pages/Sales').then((m) => ({ default: m.Sales }))
+  import('./pages/Sales').then((m) => ({
+    default: m.Sales,
+  }))
 );
 
 const Financial = lazy(() =>
-  import('./pages/Financial').then((m) => ({ default: m.Financial }))
+  import('./pages/Financial').then((m) => ({
+    default: m.Financial,
+  }))
 );
 
 const Marketing = lazy(() =>
-  import('./pages/Marketing').then((m) => ({ default: m.Marketing }))
+  import('./pages/Marketing').then((m) => ({
+    default: m.Marketing,
+  }))
 );
 
 const Inventory = lazy(() =>
-  import('./pages/Inventory').then((m) => ({ default: m.Inventory }))
+  import('./pages/Inventory').then((m) => ({
+    default: m.Inventory,
+  }))
 );
 
 const Customers = lazy(() =>
-  import('./pages/Customers').then((m) => ({ default: m.Customers }))
+  import('./pages/Customers').then((m) => ({
+    default: m.Customers,
+  }))
 );
 
 const AiInsights = lazy(() =>
-  import('./pages/AiInsights').then((m) => ({ default: m.AiInsights }))
+  import('./pages/AiInsights').then((m) => ({
+    default: m.AiInsights,
+  }))
 );
 
 const DataExplorer = lazy(() =>
-  import('./pages/DataExplorer').then((m) => ({ default: m.DataExplorer }))
+  import('./pages/DataExplorer').then((m) => ({
+    default: m.DataExplorer,
+  }))
 );
 
 const Reports = lazy(() =>
-  import('./pages/Reports').then((m) => ({ default: m.Reports }))
+  import('./pages/Reports').then((m) => ({
+    default: m.Reports,
+  }))
 );
 
 const Integrations = lazy(() =>
-  import('./pages/Integrations').then((m) => ({ default: m.Integrations }))
+  import('./pages/Integrations').then((m) => ({
+    default: m.Integrations,
+  }))
 );
 
 const Notifications = lazy(() =>
-  import('./pages/Notifications').then((m) => ({ default: m.Notifications }))
+  import('./pages/Notifications').then((m) => ({
+    default: m.Notifications,
+  }))
 );
 
 const Settings = lazy(() =>
-  import('./pages/Settings').then((m) => ({ default: m.Settings }))
+  import('./pages/Settings').then((m) => ({
+    default: m.Settings,
+  }))
 );
 
 const UserManagement = lazy(() =>
@@ -110,17 +136,18 @@ function Dashboard() {
     useState<string | null>(null);
 
   /*
-   * Seed notifications after profile loads.
+   * Seed notifications after the authenticated
+   * user's profile has loaded.
    */
   useEffect(() => {
     if (profile) {
-      seedNotificationsIfEmpty(profile.id);
+      void seedNotificationsIfEmpty(profile.id);
     }
   }, [profile]);
 
   /*
-   * Automatically create an organization when the authenticated
-   * user does not belong to one.
+   * Automatically create an organization when the
+   * authenticated user does not belong to one.
    */
   useEffect(() => {
     if (
@@ -142,7 +169,8 @@ function Dashboard() {
 
       try {
         /*
-         * Build a safe organization name from the user's profile.
+         * Get the user's name from the profile,
+         * metadata, or email.
          */
         const fullName =
           profile?.full_name?.trim() ||
@@ -150,10 +178,11 @@ function Dashboard() {
           user.email?.split('@')[0] ||
           'My Organization';
 
-        const organizationName = `${fullName}'s Organization`;
+        const organizationName =
+          `${fullName}'s Organization`;
 
         /*
-         * Generate a URL-safe slug.
+         * Create a URL-safe unique slug.
          */
         const baseSlug = fullName
           .toLowerCase()
@@ -164,10 +193,11 @@ function Dashboard() {
         const organizationSlug =
           `${baseSlug || 'organization'}-${user.id.slice(0, 8)}`;
 
-        const organization = await createOrganization(
-          organizationName,
-          organizationSlug
-        );
+        const organization =
+          await createOrganization(
+            organizationName,
+            organizationSlug
+          );
 
         if (!organization) {
           throw new Error(
@@ -175,6 +205,10 @@ function Dashboard() {
           );
         }
 
+        /*
+         * Reload organizations so the newly created
+         * organization becomes currentOrganization.
+         */
         if (!cancelled) {
           await refreshOrganizations();
         }
@@ -198,7 +232,7 @@ function Dashboard() {
       }
     };
 
-    setupOrganization();
+    void setupOrganization();
 
     return () => {
       cancelled = true;
@@ -216,7 +250,7 @@ function Dashboard() {
   ]);
 
   /*
-   * Wait for authentication/profile loading.
+   * Authentication/profile loading.
    */
   if (loading) {
     return (
@@ -230,7 +264,7 @@ function Dashboard() {
   }
 
   /*
-   * Wait for organization loading.
+   * Organization loading.
    */
   if (organizationLoading) {
     return (
@@ -248,7 +282,7 @@ function Dashboard() {
   }
 
   /*
-   * Creating the user's first organization.
+   * Creating first organization.
    */
   if (creatingOrganization) {
     return (
@@ -270,7 +304,7 @@ function Dashboard() {
   }
 
   /*
-   * Organization loading failed.
+   * Organization setup/loading error.
    */
   if (organizationError || organizationSetupError) {
     const errorMessage =
@@ -291,8 +325,8 @@ function Dashboard() {
           </h2>
 
           <p className="text-sm text-muted mb-4">
-            We could not prepare the organization associated
-            with your account.
+            We could not prepare the organization
+            associated with your account.
           </p>
 
           <p className="text-xs text-error break-words">
@@ -304,11 +338,13 @@ function Dashboard() {
   }
 
   /*
-   * At this point, if there is still no organization,
-   * show a temporary setup state instead of blocking
-   * the user with the old "No organization found" screen.
+   * This should only be temporary while organization
+   * creation/refresh is completing.
    */
-  if (!currentOrganization && organizations.length === 0) {
+  if (
+    !currentOrganization &&
+    organizations.length === 0
+  ) {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-bg">
         <Loader2
@@ -323,7 +359,12 @@ function Dashboard() {
     );
   }
 
-  const withSuspense = (node: React.ReactNode) => (
+  /*
+   * Suspense wrapper for lazy-loaded pages.
+   */
+  const withSuspense = (
+    node: React.ReactNode
+  ) => (
     <Suspense
       fallback={
         <div className="flex items-center justify-center py-24">
@@ -338,6 +379,9 @@ function Dashboard() {
     </Suspense>
   );
 
+  /*
+   * Render active dashboard page.
+   */
   const renderPage = () => {
     switch (page) {
       case 'overview':
@@ -349,7 +393,9 @@ function Dashboard() {
         );
 
       case 'realtime':
-        return withSuspense(<Realtime />);
+        return withSuspense(
+          <Realtime />
+        );
 
       case 'sales':
         return withSuspense(
@@ -392,25 +438,39 @@ function Dashboard() {
         );
 
       case 'ai':
-        return withSuspense(<AiInsights />);
+        return withSuspense(
+          <AiInsights />
+        );
 
       case 'data':
-        return withSuspense(<DataExplorer />);
+        return withSuspense(
+          <DataExplorer />
+        );
 
       case 'reports':
-        return withSuspense(<Reports />);
+        return withSuspense(
+          <Reports />
+        );
 
       case 'integrations':
-        return withSuspense(<Integrations />);
+        return withSuspense(
+          <Integrations />
+        );
 
       case 'notifications':
-        return withSuspense(<Notifications />);
+        return withSuspense(
+          <Notifications />
+        );
 
       case 'settings':
-        return withSuspense(<Settings />);
+        return withSuspense(
+          <Settings />
+        );
 
       case 'users':
-        return withSuspense(<UserManagement />);
+        return withSuspense(
+          <UserManagement />
+        );
 
       default:
         return withSuspense(
@@ -422,13 +482,29 @@ function Dashboard() {
     }
   };
 
+  /*
+   * IMPORTANT:
+   *
+   * Use the organization membership role first.
+   *
+   * Example:
+   * currentOrganization.role = "owner"
+   *
+   * This prevents the profile role "viewer" from
+   * incorrectly overriding the organization role.
+   */
   const requiredPermission =
     PAGE_PERMISSIONS[page];
+
+  const effectiveRole =
+    currentOrganization?.role ??
+    profile?.role ??
+    'viewer';
 
   const canAccess =
     !requiredPermission ||
     hasPermission(
-      profile?.role,
+      effectiveRole as never,
       requiredPermission as never
     );
 
@@ -455,8 +531,8 @@ function Dashboard() {
           <p className="text-sm text-muted max-w-sm">
             Your role (
             {ROLE_LABELS[
-              profile?.role ?? 'viewer'
-            ]}
+              effectiveRole as keyof typeof ROLE_LABELS
+            ] ?? effectiveRole}
             ) does not have permission to view this page.
             Contact your administrator to request access.
           </p>
@@ -467,8 +543,14 @@ function Dashboard() {
 }
 
 function AppInner() {
-  const { session, loading } = useAuth();
+  const {
+    session,
+    loading,
+  } = useAuth();
 
+  /*
+   * Wait for Supabase authentication state.
+   */
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-bg">
@@ -480,10 +562,16 @@ function AppInner() {
     );
   }
 
+  /*
+   * No authenticated session -> Login.
+   */
   if (!session) {
     return <Login />;
   }
 
+  /*
+   * Authenticated -> Dashboard.
+   */
   return <Dashboard />;
 }
 
